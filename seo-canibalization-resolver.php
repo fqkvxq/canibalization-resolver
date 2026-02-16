@@ -53,7 +53,7 @@ class SEO_Cannibalization_Resolver {
     private function load_dependencies() {
         require_once SCR_PLUGIN_DIR . 'includes/class-database.php';
         require_once SCR_PLUGIN_DIR . 'includes/class-gsc-api.php';
-        require_once SCR_PLUGIN_DIR . 'includes/class-cannibalization-detector.php';
+        require_once SCR_PLUGIN_DIR . 'includes/class-canibalization-detector.php';
         require_once SCR_PLUGIN_DIR . 'includes/class-admin-page.php';
     }
     
