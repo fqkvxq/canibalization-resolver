@@ -267,6 +267,73 @@ class SEO_Cannibalization_Resolver {
         
         wp_send_json_success(array('auth_url' => $auth_url));
     }
+
+    /**
+ * AJAX: GSC設定保存
+ */
+public function ajax_save_gsc_settings() {
+    check_ajax_referer('scr_admin_nonce', 'nonce');
+    
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => '権限がありません'));
+    }
+    
+    $client_id = sanitize_text_field($_POST['client_id'] ?? '');
+    $client_secret = sanitize_text_field($_POST['client_secret'] ?? '');
+    
+    if (empty($client_id) || empty($client_secret)) {
+        wp_send_json_error(array('message' => 'Client IDとClient Secretを入力してください'));
+    }
+    
+    update_option('scr_gsc_client_id', $client_id);
+    update_option('scr_gsc_client_secret', $client_secret);
+    
+    wp_send_json_success(array('message' => '設定を保存しました'));
+}
+
+/**
+ * AJAX: GSC接続解除
+ */
+public function ajax_disconnect_gsc() {
+    check_ajax_referer('scr_admin_nonce', 'nonce');
+    
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => '権限がありません'));
+    }
+    
+    $gsc_api = new SCR_GSC_API();
+    $gsc_api->disconnect();
+    
+    wp_send_json_success(array('message' => '接続を解除しました'));
+}
+
+/**
+ * AJAX: ステータス更新
+ */
+public function ajax_update_status() {
+    check_ajax_referer('scr_admin_nonce', 'nonce');
+    
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => '権限がありません'));
+    }
+    
+    $id = intval($_POST['id'] ?? 0);
+    $status = sanitize_text_field($_POST['status'] ?? '');
+    
+    if (empty($id) || !in_array($status, array('pending', 'resolved', 'ignored'))) {
+        wp_send_json_error(array('message' => '無効なパラメータです'));
+    }
+    
+    $result = SCR_Database::update_status($id, $status);
+    
+    if ($result === false) {
+        wp_send_json_error(array('message' => '更新に失敗しました'));
+    }
+    
+    wp_send_json_success(array('message' => 'ステータスを更新しました'));
+}
+
+    
 }
 
 // プラグイン初期化
