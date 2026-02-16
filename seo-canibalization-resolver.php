@@ -53,7 +53,7 @@ class SEO_Cannibalization_Resolver {
     private function load_dependencies() {
         require_once SCR_PLUGIN_DIR . 'includes/class-database.php';
         require_once SCR_PLUGIN_DIR . 'includes/class-gsc-api.php';
-        require_once SCR_PLUGIN_DIR . 'includes/class-canibalization-detector.php';
+        require_once SCR_PLUGIN_DIR . 'includes/class-cannibalization-detector.php';
         require_once SCR_PLUGIN_DIR . 'includes/class-admin-page.php';
     }
     
@@ -66,15 +66,14 @@ class SEO_Cannibalization_Resolver {
         
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
+        
+        // AJAXアクション
         add_action('wp_ajax_scr_fetch_gsc_data', array($this, 'ajax_fetch_gsc_data'));
         add_action('wp_ajax_scr_analyze_cannibalization', array($this, 'ajax_analyze_cannibalization'));
         add_action('wp_ajax_scr_connect_gsc', array($this, 'ajax_connect_gsc'));
-
-        // ↓↓↓ 以下の3行を追加 ↓↓↓
         add_action('wp_ajax_scr_save_gsc_settings', array($this, 'ajax_save_gsc_settings'));
         add_action('wp_ajax_scr_disconnect_gsc', array($this, 'ajax_disconnect_gsc'));
         add_action('wp_ajax_scr_update_status', array($this, 'ajax_update_status'));
-}
     }
     
     /**
@@ -150,20 +149,20 @@ class SEO_Cannibalization_Resolver {
             SCR_VERSION
         );
         
-        wp_enqueue_script(
-            'scr-admin-script',
-            SCR_PLUGIN_URL . 'assets/js/admin-script.js',
-            array('jquery', 'chart-js'),
-            SCR_VERSION,
-            true
-        );
-        
         // Chart.js
         wp_enqueue_script(
             'chart-js',
             'https://cdn.jsdelivr.net/npm/chart.js',
             array(),
             '4.4.0',
+            true
+        );
+        
+        wp_enqueue_script(
+            'scr-admin-script',
+            SCR_PLUGIN_URL . 'assets/js/admin-script.js',
+            array('jquery', 'chart-js'),
+            SCR_VERSION,
             true
         );
         
@@ -267,73 +266,71 @@ class SEO_Cannibalization_Resolver {
         
         wp_send_json_success(array('auth_url' => $auth_url));
     }
-
+    
     /**
- * AJAX: GSC設定保存
- */
-public function ajax_save_gsc_settings() {
-    check_ajax_referer('scr_admin_nonce', 'nonce');
-    
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => '権限がありません'));
+     * AJAX: GSC設定保存
+     */
+    public function ajax_save_gsc_settings() {
+        check_ajax_referer('scr_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => '権限がありません'));
+        }
+        
+        $client_id = sanitize_text_field($_POST['client_id'] ?? '');
+        $client_secret = sanitize_text_field($_POST['client_secret'] ?? '');
+        
+        if (empty($client_id) || empty($client_secret)) {
+            wp_send_json_error(array('message' => 'Client IDとClient Secretを入力してください'));
+        }
+        
+        update_option('scr_gsc_client_id', $client_id);
+        update_option('scr_gsc_client_secret', $client_secret);
+        
+        wp_send_json_success(array('message' => '設定を保存しました'));
     }
     
-    $client_id = sanitize_text_field($_POST['client_id'] ?? '');
-    $client_secret = sanitize_text_field($_POST['client_secret'] ?? '');
-    
-    if (empty($client_id) || empty($client_secret)) {
-        wp_send_json_error(array('message' => 'Client IDとClient Secretを入力してください'));
+    /**
+     * AJAX: GSC接続解除
+     */
+    public function ajax_disconnect_gsc() {
+        check_ajax_referer('scr_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => '権限がありません'));
+        }
+        
+        $gsc_api = new SCR_GSC_API();
+        $gsc_api->disconnect();
+        
+        wp_send_json_success(array('message' => '接続を解除しました'));
     }
     
-    update_option('scr_gsc_client_id', $client_id);
-    update_option('scr_gsc_client_secret', $client_secret);
-    
-    wp_send_json_success(array('message' => '設定を保存しました'));
-}
-
-/**
- * AJAX: GSC接続解除
- */
-public function ajax_disconnect_gsc() {
-    check_ajax_referer('scr_admin_nonce', 'nonce');
-    
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => '権限がありません'));
+    /**
+     * AJAX: ステータス更新
+     */
+    public function ajax_update_status() {
+        check_ajax_referer('scr_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => '権限がありません'));
+        }
+        
+        $id = intval($_POST['id'] ?? 0);
+        $status = sanitize_text_field($_POST['status'] ?? '');
+        
+        if (empty($id) || !in_array($status, array('pending', 'resolved', 'ignored'))) {
+            wp_send_json_error(array('message' => '無効なパラメータです'));
+        }
+        
+        $result = SCR_Database::update_status($id, $status);
+        
+        if ($result === false) {
+            wp_send_json_error(array('message' => '更新に失敗しました'));
+        }
+        
+        wp_send_json_success(array('message' => 'ステータスを更新しました'));
     }
-    
-    $gsc_api = new SCR_GSC_API();
-    $gsc_api->disconnect();
-    
-    wp_send_json_success(array('message' => '接続を解除しました'));
-}
-
-/**
- * AJAX: ステータス更新
- */
-public function ajax_update_status() {
-    check_ajax_referer('scr_admin_nonce', 'nonce');
-    
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => '権限がありません'));
-    }
-    
-    $id = intval($_POST['id'] ?? 0);
-    $status = sanitize_text_field($_POST['status'] ?? '');
-    
-    if (empty($id) || !in_array($status, array('pending', 'resolved', 'ignored'))) {
-        wp_send_json_error(array('message' => '無効なパラメータです'));
-    }
-    
-    $result = SCR_Database::update_status($id, $status);
-    
-    if ($result === false) {
-        wp_send_json_error(array('message' => '更新に失敗しました'));
-    }
-    
-    wp_send_json_success(array('message' => 'ステータスを更新しました'));
-}
-
-    
 }
 
 // プラグイン初期化
