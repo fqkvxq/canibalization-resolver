@@ -69,6 +69,12 @@ class SEO_Cannibalization_Resolver {
         add_action('wp_ajax_scr_fetch_gsc_data', array($this, 'ajax_fetch_gsc_data'));
         add_action('wp_ajax_scr_analyze_cannibalization', array($this, 'ajax_analyze_cannibalization'));
         add_action('wp_ajax_scr_connect_gsc', array($this, 'ajax_connect_gsc'));
+
+        // ↓↓↓ 以下の3行を追加 ↓↓↓
+        add_action('wp_ajax_scr_save_gsc_settings', array($this, 'ajax_save_gsc_settings'));
+        add_action('wp_ajax_scr_disconnect_gsc', array($this, 'ajax_disconnect_gsc'));
+        add_action('wp_ajax_scr_update_status', array($this, 'ajax_update_status'));
+}
     }
     
     /**
